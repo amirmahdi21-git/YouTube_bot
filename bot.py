@@ -16,7 +16,7 @@ from config import BOT_TOKEN, DOWNLOAD_PATH
 from downloader import download_video, download_audio
 
 logging.basicConfig(
-    format="%(asctime)s - %(name)s -  %(levelname)s - %(message)s",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Hello could you please send me YouTube video link?"
+        "Hello could you please send me a YouTube video link?"
     )
 
 
@@ -38,9 +38,8 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["url"] = url
     keyboard = [
         [
-            InlineKeyboardButton("🎬 video (MP3)", callback_data="video"),
-            InlineKeyboardButton("🎵 audio (MP3) ", callback_data="audio"),
-
+            InlineKeyboardButton("🎬 video (MP4)", callback_data="video"),
+            InlineKeyboardButton("🎵 audio (MP3)", callback_data="audio"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -55,7 +54,7 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     url = context.user_data.get("url")
     if not url:
-        await query.edit_message_text("The link wasn't found! please send the link again.")
+        await query.edit_message_text("The link wasn't found! Please send the link again.")
         return
 
     choice = query.data
@@ -64,16 +63,22 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filepath = None
     try:
         if choice == "video":
-            filepath = download_video(url)
+            filepath = download_video(url, DOWNLOAD_PATH)
+            if not filepath:
+                await query.edit_message_text("Download failed. Please try again.")
+                return
             with open(filepath, "rb") as f:
                 await context.bot.send_video(
                     chat_id=query.message.chat_id,
-                    audio=f,
+                    video=f,
                     read_timeout=120,
                     write_timeout=120,
                 )
         elif choice == "audio":
-            filepath = download_audio(url)
+            filepath = download_audio(url, DOWNLOAD_PATH)
+            if not filepath:
+                await query.edit_message_text("Download failed. Please try again.")
+                return
             with open(filepath, "rb") as f:
                 await context.bot.send_audio(
                     chat_id=query.message.chat_id,
@@ -88,8 +93,8 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Finished!")
 
     except Exception as e:
-        logger.exception("Download/send faild")
-        await query.edit_message_text(f'Download faild : {e}')
+        logger.exception("Download/send failed")
+        await query.edit_message_text(f"Download failed: {e}")
 
     finally:
         if filepath and os.path.exists(filepath):
@@ -97,7 +102,7 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 os.remove(filepath)
             except OSError:
                 pass
-        context.user_data.pop("url , None")
+        context.user_data.pop("url", None)
 
 
 def main():
@@ -109,7 +114,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_button))
 
     logger.info("Bot is starting....")
-    app.run_pollig()
+    app.run_polling()
 
 
 if __name__ == "__main__":
